@@ -1,0 +1,18 @@
+{
+    "name": "gyp-expansions",
+    "version": "0.0.0",
+    "description": "Applies string and list expansions to GYP data structures",
+    "main": "index.js",
+    "scripts": {
+        "test": "tap ./test"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/aredridel/gyp-expansions"
+    },
+    "devDependencies": {
+        "tap": "~0.4.0"
+    },
+    "author": "Aria Stewart <aredridel@nbtsc.org>",
+    "license": "BSD"
+}

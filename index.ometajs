@@ -1,0 +1,51 @@
+function h () { console.log('!'); return true; }
+
+ometa Expansion {
+    flag = '<' ?{this._options.phase == 'pre'}
+        | '>' ?{this._options.phase == 'post'},
+
+    ref = flag ('@' | empty) '(' ( ~')' char)*:c ')' -> this._options.variables[c.join('')]
+        | (flag | empty) '!' ('@' | empty) '(' command:c ')' -> [`command, c],
+
+    command = '[' arguments:a ']' -> a
+        | stringInside:s -> s,
+
+    arguments = listOf(`string, ','),
+
+    string = '"' stringInside('"')*:c '"'    -> c.join('')
+        | '\'' stringInside('\'')*:c '\''     -> c.join(''),
+
+    stringInside :x = ref:r  -> r
+        | '\\' char:y        -> y
+        | (~token(x) char):c -> c,
+
+    stringRaw = stringInside('')*:c -> c.join('')
+}
+
+var expansions = module.exports = {
+    parser: Expansion,
+
+    expandString: function (s, variables, which) {
+        return Expansion.matchAll(s, 'stringRaw', {variables: variables, phase: which});
+    },
+
+    expandArray: function (a, variables, which) {
+        var re = which == 'pre' ? /^<@\((.*)\)$/ : /^>@\((.*)\)$/;
+        var out = [];
+        var m;
+        for (var i = 0; i < a.length; i++) {
+            if (m = re.exec(a[i])) {
+                if (Array.isArray(variables[m[1]])) {
+                    variables[m[1]].forEach(function(e) {
+                        out.push(e);
+                    });
+                } else {
+                    out.push(variables[m[1]]);
+                }
+            } else {
+                out.push(a[i]);
+            }
+        }
+        return out;
+    }
+};
