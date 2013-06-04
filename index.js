@@ -8,9 +8,15 @@ var BSJSIdentity = ometajs_.grammars.BSJSIdentity;
 
 var BSJSTranslator = ometajs_.grammars.BSJSTranslator;
 
+var cp = require("child_process");
+
 function h() {
     console.log("!");
     return true;
+}
+
+function outputOf(command) {
+    return command;
 }
 
 var Expansion = function Expansion(source, opts) {
@@ -60,7 +66,7 @@ Expansion.prototype["ref"] = function $ref() {
         })) && this._match("!") && (this._match("@") || this._atomic(function() {
             return this._rule("empty", false, [], null, this["empty"]);
         })) && this._match("(") && this._rule("command", false, [], null, this["command"]) && (c = this._getIntermediate(), 
-        true) && this._match(")") && this._exec([ "command", c ]);
+        true) && this._match(")") && this._exec(outputOf(c));
     });
 };
 
@@ -71,13 +77,18 @@ Expansion.prototype["command"] = function $command() {
         true) && this._match("]") && this._exec(a);
     }) || this._atomic(function() {
         var s;
-        return this._rule("stringInside", false, [], null, this["stringInside"]) && (s = this._getIntermediate(), 
-        true) && this._exec(s);
+        return this._any(function() {
+            return this._atomic(function() {
+                return this._rule("stringInside", false, [ ")" ], null, this["stringInside"]);
+            });
+        }) && (s = this._getIntermediate(), true) && this._exec(s.join(""));
     });
 };
 
 Expansion.prototype["arguments"] = function $arguments() {
-    return this._rule("listOf", false, [ "string", "," ], null, this["listOf"]);
+    var s;
+    return this._rule("listOf", false, [ "string", "," ], null, this["listOf"]) && (s = this._getIntermediate(), 
+    true) && this._exec(s);
 };
 
 Expansion.prototype["string"] = function $string() {
@@ -129,11 +140,11 @@ Expansion.prototype["stringRaw"] = function $stringRaw() {
 
 var expansions = module.exports = {
     parser: Expansion,
-    expandString: function(s, variables, which) {
-        return Expansion.matchAll(s, "stringRaw", {
+    expandString: function(s, variables, which, cb) {
+        cb(null, Expansion.matchAll(s, "stringRaw", {
             variables: variables,
             phase: which
-        });
+        }));
     },
     expandArray: function(a, variables, which) {
         var re = which == "pre" ? /^<@\((.*)\)$/ : /^>@\((.*)\)$/;

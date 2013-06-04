@@ -1,16 +1,22 @@
+var cp = require('child_process');
+
 function h () { console.log('!'); return true; }
+
+function outputOf(command) {
+    return command;
+}
 
 ometa Expansion {
     flag = '<' ?{this._options.phase == 'pre'}
         | '>' ?{this._options.phase == 'post'},
 
     ref = flag ('@' | empty) '(' ( ~')' char)*:c ')' -> this._options.variables[c.join('')]
-        | (flag | empty) '!' ('@' | empty) '(' command:c ')' -> [`command, c],
+        | (flag | empty) '!' ('@' | empty) '(' command:c ')' -> outputOf(c),
 
     command = '[' arguments:a ']' -> a
-        | stringInside:s -> s,
+        | stringInside(')')*:s -> s.join(''),
 
-    arguments = listOf(`string, ','),
+    arguments = listOf(`string, ','):s -> s,
 
     string = '"' stringInside('"')*:c '"'    -> c.join('')
         | '\'' stringInside('\'')*:c '\''     -> c.join(''),
@@ -25,11 +31,11 @@ ometa Expansion {
 var expansions = module.exports = {
     parser: Expansion,
 
-    expandString: function (s, variables, which) {
-        return Expansion.matchAll(s, 'stringRaw', {variables: variables, phase: which});
+    expandString: function (s, variables, which, cb) {
+        cb(null, Expansion.matchAll(s, 'stringRaw', {variables: variables, phase: which}));
     },
 
-    expandArray: function (a, variables, which) {
+    expandArray: function (a, variables, which, cb) {
         var re = which == 'pre' ? /^<@\((.*)\)$/ : /^>@\((.*)\)$/;
         var out = [];
         var m;
@@ -46,6 +52,7 @@ var expansions = module.exports = {
                 out.push(a[i]);
             }
         }
-        return out;
+
+        cb(null, out);
     }
 };
