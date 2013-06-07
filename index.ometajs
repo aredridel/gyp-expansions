@@ -1,38 +1,59 @@
 var cp = require('child_process');
 
-function h () { console.log('!'); return true; }
-
 function outputOf(command) {
     return command;
+}
+
+function command(c) {
+    return {type: 'command', command: c};
+}
+
+function str(s) {
+    return {type: 'string', value: s};
+}
+
+function ref(c, v) {
+    return {type: 'ref', variable: c, value: v[c]};
+}
+
+function args(a) {
+    return {type: 'arguments', value: a};
 }
 
 ometa Expansion {
     flag = '<' ?{this._options.phase == 'pre'}
         | '>' ?{this._options.phase == 'post'},
 
-    ref = flag ('@' | empty) '(' ( ~')' char)*:c ')' -> this._options.variables[c.join('')]
-        | (flag | empty) '!' ('@' | empty) '(' command:c ')' -> outputOf(c),
+    ref = flag ('@' | empty) '(' ( ~')' char)*:c ')' -> ref(c.join(''), this._options.variables)
+        | (flag | empty) '!' ('@' | empty) '(' command:c ')' -> command(c),
 
-    command = '[' arguments:a ']' -> a
-        | stringInside(')')*:s -> s.join(''),
+    command = '[' listOf(`string, ','):a ']' -> args(a)
+        | stringInside(')')*:s    -> s,
 
-    arguments = listOf(`string, ','):s -> s,
+    string = '"' stringInside('"')*:c '"'    -> c
+        | '\'' stringInside('\'')*:c '\''    -> c,
 
-    string = '"' stringInside('"')*:c '"'    -> c.join('')
-        | '\'' stringInside('\'')*:c '\''     -> c.join(''),
+    stringInside :x = ref:r       -> r
+        | (~ref stringInsideParts(x))+:p -> str(p.join('')),
 
-    stringInside :x = ref:r  -> r
-        | '\\' char:y        -> y
-        | (~token(x) char):c -> c,
+    stringInsideRaw = ref:r -> r
+        | (~ref stringInsidePartsRaw)+:p -> str(p.join('')),
 
-    stringRaw = stringInside('')*:c -> c.join('')
+    stringInsidePartsRaw = '\\' char:y -> y
+        | char:c -> c,
+
+    stringInsideParts :x = '\\' char:y -> y
+        | (~seq(x) char):c      -> c,
+
+    stringRaw = stringInsideRaw*:c -> c
 }
 
 var expansions = module.exports = {
     parser: Expansion,
 
     expandString: function (s, variables, which, cb) {
-        cb(null, Expansion.matchAll(s, 'stringRaw', {variables: variables, phase: which}));
+        var tree = Expansion.matchAll(s, 'stringRaw', {variables: variables, phase: which});
+        cb(null, tree);
     },
 
     expandArray: function (a, variables, which, cb) {
