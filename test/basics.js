@@ -58,10 +58,12 @@ test('A simple post-phase expansion', function(t) {
     });
 });
 
-/* test('Handle command execution', function(t) {
-    t.plan(1);
+test('Handle command execution', function(t) {
+    t.plan(2);
     expansions.expandString('<!(echo hi)', { a: '1' }, 'pre', function (e, r) {
         t.equal(r, 'hi');
     });
+    expansions.expandString('<!(["echo","hi"])', { a: '1' }, 'pre', function (e, r) {
+        t.equal(r, 'hi');
+    });
 });
-*/
