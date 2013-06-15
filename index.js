@@ -10,10 +10,6 @@ var BSJSTranslator = ometajs_.grammars.BSJSTranslator;
 
 var cp = require("child_process");
 
-function outputOf(command) {
-    return command;
-}
-
 function command(c) {
     return {
         type: "command",
@@ -199,6 +195,56 @@ Expansion.prototype["stringRaw"] = function $stringRaw() {
     }) && (c = this._getIntermediate(), true) && this._exec(c);
 };
 
+function iter(array, proc, cb) {
+    var done = 0;
+    var result = [];
+    for (var i = 0; i < array.length; i++) {
+        (function(j) {
+            setImmediate(function() {
+                proc(array[j], function(err, res) {
+                    if (err) cb(err);
+                    result[j] = res;
+                    if (++done == array.length) cb(null, result);
+                });
+            });
+        })(i);
+    }
+}
+
+function handleNode(e, cb) {
+    if (e.type == "command") {
+        if (Array.isArray(e.command)) {
+            iter(e.command, handleNode, function(err, res) {
+                if (err) return cb(err);
+                cp.exec(res.join(""), function(err, stdout) {
+                    if (err) return cb(err);
+                    cb(null, stdout[stdout.length - 1] == "\n" ? stdout.slice(0, stdout.length - 1) : stdout);
+                });
+            });
+        } else if (e.command.type == "arguments") {
+            iter(e.command.value, function(n, cb) {
+                iter(n, handleNode, function(err, res) {
+                    if (err) return cb(err);
+                    cb(null, res.join(""));
+                });
+            }, function(err, res) {
+                cp.execFile(res[0], res.slice(1), function(err, stdout) {
+                    if (err) return cb(err);
+                    cb(null, stdout[stdout.length - 1] == "\n" ? stdout.slice(0, stdout.length - 1) : stdout);
+                });
+            });
+        } else {
+            cb(new Error("unknown command node type"));
+        }
+    } else if (e.type == "ref") {
+        cb(null, e.value);
+    } else if (e.type == "string") {
+        cb(null, e.value);
+    } else {
+        cb(null, e);
+    }
+}
+
 var expansions = module.exports = {
     parser: Expansion,
     expandString: function(s, variables, which, cb) {
@@ -206,7 +252,12 @@ var expansions = module.exports = {
             variables: variables,
             phase: which
         });
-        cb(null, tree);
+        iter(tree, handleNode, function(err, res) {
+            if (err) return cb(err);
+            setImmediate(function() {
+                cb(null, res.join(""));
+            });
+        });
     },
     expandArray: function(a, variables, which, cb) {
         var re = which == "pre" ? /^<@\((.*)\)$/ : /^>@\((.*)\)$/;
