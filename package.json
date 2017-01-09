@@ -14,7 +14,7 @@
     "tap": "~9.0.2"
   },
   "optionalDependencies": {
-    "ometajs": "~3.2.4"
+    "ometajs": "~4.0.0"
   },
   "author": "Aria Stewart <aredridel@nbtsc.org>",
   "license": "BSD"
